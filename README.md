@@ -5,7 +5,7 @@ Read The F*cking Android Source Code
 **目录**
 
 * [Android 源码分析开篇](0x00-start-up.md)
-* [工具选择](0x01-tools.md)
+* [阅读源码工具选用](0x01-tools.md)
 
 **历史 Android 源码分析文章**
 
