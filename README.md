@@ -1,6 +1,6 @@
 # rtfsc-android
 
-Read The F*cking Android Source Code
+Read The F\*cking Android Source Code
 
 **目录**
 
