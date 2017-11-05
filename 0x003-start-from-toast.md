@@ -1,6 +1,7 @@
 # Android 源码分析 —— 从 Toast 出发
 
 ![](./assets/toast.png)
+
 （图 from Android Developers）
 
 Toast 是 Android 开发里较常用的一个类了，有时候用它给用户弹提示信息和界面反馈，有时候用它来作为辅助调试的手段。用得多了，自然想对其表层之下的运行机制有所了解，所以在此将它选为我的第一个 RTFSC Roots。
@@ -11,7 +12,7 @@ Toast 是 Android 开发里较常用的一个类了，有时候用它给用户�
 
 ## Toast 印象
 
-首先我们从 Toast 类的 (官方文档)[1] 和 (API 指南)[2] 中可以得出它具备如下特性：
+首先我们从 Toast 类的 [官方文档](1) 和 [API 指南](2) 中可以得出它具备如下特性：
 
 1. Toast 不是 View，它用于帮助创建并展示包含一条小消息的 View；
 
