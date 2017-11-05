@@ -7,6 +7,7 @@ Read The F\*cking Android Source Code
 * [Android 源码分析开篇](0x000-start-up.md)
 * [阅读源码工具选用](0x001-tools.md)
 * [阅读源码的意义与方法](0x002-methods-and-meaning.md)
+* [Android 源码分析 —— 从 Toast 出发](0x003-start-from-toast.md)
 
 **历史 Android 源码分析文章**
 
