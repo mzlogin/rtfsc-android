@@ -220,11 +220,10 @@ new Thread(new Runnable() {
 ```
 11-07 13:35:33.980 2020-2035/org.mazhuang.androiduidemos E/AndroidRuntime: FATAL EXCEPTION: Thread-77
     java.lang.RuntimeException: Can't create handler inside thread that has not called Looper.prepare()
-        at android.os.Handler.<init>(Handler.java:197)
-        at android.os.Handler.<init>(Handler.java:111)
-        at android.widget.Toast$TN.<init>(Toast.java:324)
-        at android.widget.Toast.<init>(Toast.java:91)
-        at android.widget.Toast.makeText(Toast.java:238)
+        at android.widget.Toast$TN.<init>(Toast.java:390)
+        at android.widget.Toast.<init>(Toast.java:114)
+        at android.widget.Toast.makeText(Toast.java:277)
+        at android.widget.Toast.makeText(Toast.java:267)
         at org.mazhuang.androiduidemos.MainActivity$1.run(MainActivity.java:27)
         at java.lang.Thread.run(Thread.java:856)
 ```
