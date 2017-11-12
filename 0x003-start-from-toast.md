@@ -865,7 +865,7 @@ private static class TN extends ITransientNotification.Stub {
 
 ---
 
-最后，照例要安利一下我的微信公众号，「闷骚的程序员」,扫码关注，接收 rtfsc-android 的最近更新。
+最后，照例要安利一下我的微信公众号「闷骚的程序员」，扫码关注，接收 rtfsc-android 的最近更新。
 
 <div align="center"><img width="192px" height="192px" src="http://mazhuang.org/assets/images/qrcode.jpg"/></div>
 
