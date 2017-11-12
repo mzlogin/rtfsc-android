@@ -52,4 +52,6 @@
 
 2. 根据方法调用一层一层追踪；
 
-3. 使用 git blame 查看关键代码行的提交日志；
+3. 使用 git blame 查看关键代码行的提交日志，里面也许包含有用的信息；
+
+4. 形如 IXxxManager 这类接口的实现类要么是 XxxManagerService，要么是 XxxManagerImpl；

@@ -1,5 +1,7 @@
 # Android 源码分析 —— 从 Toast 出发
 
+本系列文章在 <https://github.com/mzlogin/rtfsc-android> 持续更新中，欢迎有兴趣的童鞋们关注。
+
 ![](./assets/toast.png)
 
 （图 from Android Developers）
@@ -26,7 +28,8 @@ Toast 是 Android 开发里较常用的一个类了，有时候用它给用户�
 * [总结](#总结)
     * [补充后的 Toast 知识点列表](#补充后的-toast-知识点列表)
     * [遗留知识点](#遗留知识点)
-    * [本篇用到的分析方法](#本篇用到的分析方法)
+* [本篇用到的源码分析方法](#本篇用到的源码分析方法)
+* [后话](#后话)
 
 <!-- vim-markdown-toc -->
 
@@ -260,7 +263,7 @@ public static final int TOAST_WINDOW_TIMEOUT = 3500; // 3.5 seconds
  */
 ```
 
-不信邪的我们可以快速在一个 Demo Android 工程里写一句这样的代码试试：
+不信邪的我们可以快速在一个 demo Android 工程里写一句这样的代码试试：
 
 ```java
 Toast.makeText(this, "Hello", 2);
@@ -348,7 +351,7 @@ TN(String packageName, @Nullable Looper looper) {
 }
 ```
 
-至此，我们已经追踪到了我们的崩溃的 RuntimeException，即要避免进入抛出异常的逻辑，要么调用的时候传递一个 Looper 进来（无法直接实现，能传递 Looper 参数的构造方法与 makeText 方法是 hide 的），要么 `Looper.myLooper()` 返回不为 null，提示信息 `Can't create handler inside thread that has not called Looper.prepare()` 里给出了方法，那我们在 toast 前面加一句 `Looper.prepare()` 试试？这次不崩溃了，但依然不弹出 Toast，毕竟，这个线程在调用完 `show()` 方法后就直接结束了，至于为什么调用 Toast 的线程结束与否会对 Toast 的显示隐藏等起影响，在本文的后面的章节里会进行分析。
+至此，我们已经追踪到了我们的崩溃的 RuntimeException，即要避免进入抛出异常的逻辑，要么调用的时候传递一个 Looper 进来（无法直接实现，能传递 Looper 参数的构造方法与 makeText 方法是 hide 的），要么 `Looper.myLooper()` 返回不为 null，提示信息 `Can't create handler inside thread that has not called Looper.prepare()` 里给出了方法，那我们在 toast 前面加一句 `Looper.prepare()` 试试？这次不崩溃了，但依然不弹出 Toast，毕竟，这个线程在调用完 `show()` 方法后就直接结束了，没有调用 `Looper.loop()`，至于为什么调用 Toast 的线程结束与否会对 Toast 的显示隐藏等起影响，在本文的后面的章节里会进行分析。
 
 从崩溃提示来看，Android 并没有限制在非 UI 线程里使用 Toast，只是线程得是一个有 Looper 的线程。于是我们尝试构造如下代码，发现可以成功从非 UI 线程弹出 toast 了：
 
@@ -398,7 +401,7 @@ ps. 上面这一段演示代码让人感觉为了弹出一个 Toast 好麻烦，
 
 ### 应用在后台时能不能 Toast？
 
-这个问题也比较适合用一个简单的 Demo 来尝试回答。
+这个问题也比较适合用一个简单的 demo 来尝试回答。
 
 在 MainActivity 的 onCreate 里加上这样一段代码：
 
@@ -524,43 +527,16 @@ TN(String packageName, @Nullable Looper looper) {
         }
     }
     mHandler = new Handler(looper, null) {
-        @Override
-        public void handleMessage(Message msg) {
-            switch (msg.what) {
-                case SHOW: {
-                    IBinder token = (IBinder) msg.obj;
-                    handleShow(token);
-                    break;
-                }
-                case HIDE: {
-                    handleHide();
-                    // Don't do this in handleHide() because it is also invoked by
-                    // handleShow()
-                    mNextView = null;
-                    break;
-                }
-                case CANCEL: {
-                    handleHide();
-                    // Don't do this in handleHide() because it is also invoked by
-                    // handleShow()
-                    mNextView = null;
-                    try {
-                        getService().cancelToast(mPackageName, TN.this);
-                    } catch (RemoteException e) {
-                    }
-                    break;
-                }
-            }
-        }
+        ...
     };
 }
 ```
 
-设置了 LayoutParams 的初始值，在后面 show 的时候会用到，设置了包名和 Looper。
+设置了 LayoutParams 的初始值，在后面 show 的时候会用到，设置了包名和 Looper、Handler。
 
 TN 是 App 中用于与 Notification Service 交互的对象，这里涉及到 Binder 和跨进程通信的知识，这块会在后面开新篇来讲解，这里可以简单地理解一下：Notification Service 是系统为了管理各种 App 的 Notification（包括 Toast）的服务，比如 Toast，由这个服务来统一维护一个待展示 Toast 队列，各 App 需要弹 Toast 的时候就将相关信息发送给这个服务，服务会将其加入队列，然后根据队列的情况，依次通知各 App 展示和隐藏 Toast。
 
-接下来是 show 方法：
+接下来看看 show 方法：
 
 ```java
 /**
@@ -827,6 +803,8 @@ private static class TN extends ITransientNotification.Stub {
 
 隐藏过程：hide 方法被远程调用后，先是发送了一个 HIDE 消息，接收到该消息后调用了 handleHide 方法，然后 `mWM.removeViewImmediate` 将该 View 从窗口移除。
 
+*这里插播一条结论，就是前文留下的为什么调用 Toast 的线程线束之后没弹出的 Toast 就无法弹出了的问题，因为 Notification Service 通知应用进程显示或隐藏 Toast 时，使用的是 `mHandler.obtainMessage(SHOW).sendToTarget()` 与 `mHandler.obtainMessage(HIDE).sendToTarget()`，这个消息发出去后，Handler 对应线程没有在 `Looper.loop()` 过程里的话，就没有办法进入到 Handler 的 handleMessage 方法里去，自然也就无法调用显示和隐藏 View 的流程了。`Looper.loop()` 相关的知识点将在下篇讲解。*
+
 ## 总结
 
 ### 补充后的 Toast 知识点列表
@@ -871,13 +849,25 @@ private static class TN extends ITransientNotification.Stub {
 
 3. Binder 与跨进程通信
 
-### 本篇用到的分析方法
+## 本篇用到的源码分析方法
 
 1. 查找关键变量被引用的地方；
 
 2. 按方法调用堆栈一层层逻辑跟踪与分析；
 
 3. 使用 git blame 查看关键代码行的变更日志；
+
+## 后话
+
+到此，上面提到的几个问题都已经解答完毕，对 Toast 源码的分析也告一段落。
+
+写这篇文章花费的时间比较长，所以并不能按照预计的节奏更新，这里表示抱歉。另外，各位如果有耐心读到这里，觉得本文的思路是否清晰，是否能跟随文章的节奏理解一些东西？因为我也在摸索写这类文章的组织形式，所以也希望能收到反馈，以作改进，先行谢过。
+
+---
+
+最后，照例要安利一下我的微信公众号，「闷骚的程序员」,扫码关注，接收 rtfsc-android 的最近更新。
+
+<div align="center"><img width="192px" height="192px" src="http://mazhuang.org/assets/images/qrcode.jpg"/></div>
 
 [1]: https://developer.android.com/reference/android/widget/Toast.html
 [2]: https://developer.android.com/guide/topics/ui/notifiers/toasts.html
