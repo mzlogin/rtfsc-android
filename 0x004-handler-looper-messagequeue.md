@@ -21,12 +21,16 @@
     * [Looper 与 MessageQueue](#looper-与-messagequeue)
     * [Handler 与 Looper](#handler-与-looper)
     * [消息如何分发到对应的 Handler](#消息如何分发到对应的-handler)
+    * [Handler 能用于线程切换的原理](#handler-能用于线程切换的原理)
     * [Runnable 与 MessageQueue](#runnable-与-messagequeue)
     * [能否创建关联到其它线程的 Handler](#能否创建关联到其它线程的-handler)
     * [消息可以插队吗](#消息可以插队吗)
     * [消息可以撤回吗](#消息可以撤回吗)
     * [找到主线程消息循环源码](#找到主线程消息循环源码)
 * [总结](#总结)
+    * [结论汇总](#结论汇总)
+    * [遗留知识点](#遗留知识点)
+    * [本篇用到的源码分析方法](#本篇用到的源码分析方法)
 * [后话](#后话)
 
 <!-- vim-markdown-toc -->
@@ -122,17 +126,19 @@ class LooperThread extends Thread {
 
 2. 如果 Looper 能对应多个 Handler，那通过不同的 Handler 发送的 Message，那处理的时候代码是如何知道该分发到哪一个 Handler 的 handlerMessage 方法的？
 
-3. Runnable 对象也是被添加到 MessageQueue 里吗？
+3. Handler 能用于线程切换的原理是什么？
 
-4. 可以在 A 线程创建 Handler 关联到 B 线程及其消息循环吗？
+4. Runnable 对象也是被添加到 MessageQueue 里吗？
 
-5. 如何退出消息循环？
+5. 可以在 A 线程创建 Handler 关联到 B 线程及其消息循环吗？
 
-6. 消息可以插队吗？
+6. 如何退出消息循环？
 
-7. 消息可以撤回吗？
+7. 消息可以插队吗？
 
-8. 上文提到，应用程序的主线程是运行一个消息循环，在代码里是如何反映的？
+8. 消息可以撤回吗？
+
+9. 上文提到，应用程序的主线程是运行一个消息循环，在代码里是如何反映的？
 
 ## 解答问题
 
@@ -176,7 +182,7 @@ private Looper(boolean quitAllowed) {
 
 在概览整个 Looper 的所有公开方法后，发现只有 prepare 和 prepareMainLooper 是做线程与 Looper 关联的工作的，而 prepareMainLooper 是 Android 环境调用的，不是用来给应用主动调用的。所以从 Looper 源码里掌握的信息来看，想给一个线程关联多个 Looper 的路不通。
 
-另外我们从源码里能观察到，Looper 有一个 mThread 成员，在构造 Looper 对象的时候赋值为 `Thread.currentThread()`，源码里再无修改 mThread 值的地方，所以可知 **Looper 只能关联到一个线程，且关联之后不能改变**。
+另外我们从源码里能观察到，Looper 有一个 final 的 mThread 成员，在构造 Looper 对象的时候赋值为 `Thread.currentThread()`，源码里再无可以修改 mThread 值的地方，所以可知 **Looper 只能关联到一个线程，且关联之后不能改变**。
 
 说了这么多，还记得 Looper.prepare() 里干的主要事情是 `sThreadLocal.set(new Looper(quitAllowed))` 吗？与之对应的，获取本线程关联的 Looper 对象是使用静态方法 Looper.myLooper()：
 
@@ -377,6 +383,12 @@ public void dispatchMessage(Message msg) {
 
 **小结：** 在 Handler.sendMessage 时，会将 Message.target 设置为该 Handler 对象，这样从消息队列取出 Message 后，就能调用到该 Handler 的 dispatchMessage 方法来进行处理。
 
+### Handler 能用于线程切换的原理
+
+实际上一小节的结论已经近乎揭示了其中的原理，进一步解释一下就是：
+
+**小结：** Handler 会对应一个 Looper 和 MessageQueue，而 Looper 与线程又一一对应，所以通过 Handler.sendXXX 和 Hanler.postXXX 添加到 MessageQueue 的 Message，会在这个对应的线程的 Looper.loop() 里取出来，并就地执行 Handler.dispatchMessage，这就可以完成线程切换了。
+
 ### Runnable 与 MessageQueue
 
 Handler 的 postXXX 系列方法用于调度 Runnable 对象，那它最后也是和 Message 一样被加到 MessageQueue 的吗？可是 MessageQueue 是用一个元素类型为 Message 的链表来维护消息队列的，类型不匹配。
@@ -480,7 +492,7 @@ new Thread() {
 
 ### 消息可以插队吗
 
-这个问题从Handler 源码、API 文档里都可以找到答案，答案是可以的，使用 Handler.sendMessageAtFrontOfQueue 和 Handler.postAtFrontOfQueue 这两个方法，它们会分别将 Message 和 Runnable（封装后）插入到消息队列的队首。
+这个问题从API 文档、Handler 源码里都可以找到答案，答案是可以的，使用 Handler.sendMessageAtFrontOfQueue 和 Handler.postAtFrontOfQueue 这两个方法，它们会分别将 Message 和 Runnable（封装后）插入到消息队列的队首。
 
 我目前尚未遇到过这种使用场景。
 
@@ -488,11 +500,71 @@ new Thread() {
 
 ### 消息可以撤回吗
 
+同上，可以从 Handler 的 API 文档中找到答案。
+
+可以用 Handler.hasXXX 系列方法判断关联的消息队列里是否有等待中的符合条件的 Message 和 Runnable，用 Handler.removeXXX 系列方法从消息队列里移除等待中的符合条件的 Message 和 Runnable。
+
+**小结：** 尚未分发的消息是可以撤回的，处理过的就没法了。
+
 ### 找到主线程消息循环源码
+
+我们前面提到过一个小细节，就是 Looper.prepareMainLooper 是 Android 环境调用的，而从该方法的注释可知，调用它就是为了初始化主线程 Looper，所以我们要找到主线程消息循环这部分源码，搜索 prepareMainLooper 被哪些地方引用即可。
+
+使用 insight.io 插件的功能，在 Looper.prepareMainLooper 上点一下即可看到引用处列表，一共两处：
+
+![](./assets/prepare-main-looper.png)
+
+从文件路径和文件名上猜测应该是第一处。
+
+```java
+public final class ActivityThread {
+    public static void main(String[] args) {
+        // ...
+        Looper.prepareMainLooper();
+        // ...
+        Looper.loop();
+        // ...
+    }
+}
+```
+
+就是我想象中的模样。这里只是简单找到这个位置，继续深入探索的话可以开启一个新的话题了，后续的篇章里再解决。
 
 ## 总结
 
+### 结论汇总
+
+- Thread 若与 Looper 关联，将会是一一对应的关系，且关联后关系无法改变。
+
+- Looper 与 MessageQueue 是一一对应的关系。
+
+- Handler 与 Looper 是多对一的关系，创建 Handler 实例时要么提供一个 Looper 实例，要么当前线程有关联的 Looper。
+
+- 在 Handler.sendMessage 时，会将 Message.target 设置为该 Handler 对象，这样从消息队列取出 Message 后，就能调用到该 Handler 的 dispatchMessage 方法来进行处理。
+
+- Handler 会对应一个 Looper 和 MessageQueue，而 Looper 与线程又一一对应，所以通过 Handler.sendXXX 和 Hanler.postXXX 添加到 MessageQueue 的 Message，会在这个对应的线程的 Looper.loop() 里取出来，并就地执行 Handler.dispatchMessage，这就可以完成线程切换了。
+
+- Runnable 被封装成 Message 之后添加到 MessageQueue。
+
+- 可以从一个线程创建关联到另一个线程 Looper 的 Handler，只要能拿到对应线程的 Looper 实例。
+
+- 消息可以插队，使用 Handler.xxxAtFrontOfQueue 方法。
+
+- 尚未分发的消息是可以撤回的，处理过的就没法了。
+
+### 遗留知识点
+
+1. ThreadLocal
+
+2. 应用的启动流程
+
+### 本篇用到的源码分析方法
+
+1. 文档优先
+
 ## 后话
+
+关于 Handler、Looper 和 MessageQueue 的分析在此先告一段落，这部分的内容比较容易分析，但里面细节挺多的，写得有点杂且不全，有点只见树木不见森林的感觉，想要配合画一些图，但找不到合适的画图形式。对此类主题的解析方式必须要再探索优化一下，大家有好的建议请一定告知。
 
 ---
 

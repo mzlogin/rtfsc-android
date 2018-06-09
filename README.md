@@ -8,6 +8,7 @@ Read The F\*cking Android Source Code
 * [阅读源码工具选用](0x001-tools.md)
 * [阅读源码的意义与方法](0x002-methods-and-meaning.md)
 * [Android 源码分析 —— 从 Toast 出发](0x003-start-from-toast.md)
+* [Android 源码分析 —— Handler、Looper 和 MessageQueue](0x004-handler-looper-messagequeue.md)
 
 **历史 Android 源码分析文章**
 
