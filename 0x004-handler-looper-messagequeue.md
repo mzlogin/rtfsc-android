@@ -451,26 +451,26 @@ mHandler.post(() -> {
 ```java
 new Thread() {
     @Override
-        public void run() {
-            setName("thread-one");
-            Looper.prepare();
+    public void run() {
+        setName("thread-one");
+        Looper.prepare();
 
-            final Looper threadOneLooper = Looper.myLooper();
+        final Looper threadOneLooper = Looper.myLooper();
 
-            new Thread() {
-                @Override
-                    public void run() {
-                        setName("thread-two");
-                        Handler handler = new Handler(threadOneLooper);
+        new Thread() {
+            @Override
+            public void run() {
+                setName("thread-two");
+                Handler handler = new Handler(threadOneLooper);
 
-                        handler.post(() -> {
-                                Log.v("test", Thread.currentThread().getName());
-                                });
-                    }
-            }.start();
+                handler.post(() -> {
+                        Log.v("test", Thread.currentThread().getName());
+                        });
+            }
+        }.start();
 
-            Looper.loop();
-        }
+        Looper.loop();
+    }
 }.start();
 ```
 
