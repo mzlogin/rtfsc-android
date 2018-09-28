@@ -12,8 +12,8 @@ Read The F\*cking Android Source Code
 
 **历史 Android 源码分析文章**
 
-* [Android 系统缓存扫描与清理方法分析](http://mazhuang.org/2016/01/14/android-system-cache/)
-* [从 am start 的 --user 参数说到 Android 多用户](http://mazhuang.org/2016/02/10/am-start-user-parameter/)
+* [Android 系统缓存扫描与清理方法分析](https://mazhuang.org/2016/01/14/android-system-cache/)
+* [从 am start 的 --user 参数说到 Android 多用户](https://mazhuang.org/2016/02/10/am-start-user-parameter/)
 
 ---
 
